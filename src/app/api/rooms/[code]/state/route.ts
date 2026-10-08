@@ -1,7 +1,7 @@
 import { buildPlayerView } from '@/game/view';
 import { normalizeRoomCode } from '@/server/codes';
 import { jsonError } from '@/server/input';
-import { findRoom, playerIdForToken } from '@/server/store';
+import { findRoom, playerIdForToken, touchPresence } from '@/server/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,5 +21,7 @@ export async function GET(
 
   const token = new URL(request.url).searchParams.get('token');
   const playerId = playerIdForToken(room, token);
+  // Demander son état, c'est être là : le mode secours du client vaut présence.
+  touchPresence(room, playerId);
   return Response.json({ view: buildPlayerView(room.state, playerId, Date.now()) });
 }

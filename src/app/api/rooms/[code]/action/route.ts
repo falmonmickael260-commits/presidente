@@ -10,6 +10,7 @@ import {
   kickPlayer,
   leaveRoom,
   playerIdForToken,
+  touchPresence,
   updateSettings,
   type Room,
 } from '@/server/store';
@@ -37,6 +38,9 @@ export async function POST(
   if (!room.state.players.some((p) => p.id === playerId)) {
     return jsonError("Vous ne faites plus partie de cette table.", 401);
   }
+
+  // Jouer un coup prouve la présence, même si le flux temps réel est tombé.
+  touchPresence(room, playerId);
 
   const action = typeof body.action === 'string' ? body.action : '';
   const error = handle(room, playerId, action, body);

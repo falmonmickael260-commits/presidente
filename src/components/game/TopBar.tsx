@@ -20,6 +20,7 @@ const STATUS_META: Record<ConnectionStatus, { label: string; color: string }> = 
   connecting: { label: 'Connexion…', color: 'bg-amber-300' },
   live: { label: 'En direct', color: 'bg-emerald-400' },
   reconnecting: { label: 'Reconnexion…', color: 'bg-amber-400' },
+  polling: { label: 'Mode secours', color: 'bg-amber-300' },
   gone: { label: 'Déconnecté', color: 'bg-ruby-500' },
 };
 

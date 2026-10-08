@@ -6,7 +6,17 @@ import type { PlayerView } from '@/game/view';
 import type { ServerMessage } from '@/server/protocol';
 import { clearSession, loadSession, saveSession, type StoredSession } from '@/lib/session';
 
-export type ConnectionStatus = 'connecting' | 'live' | 'reconnecting' | 'gone';
+/**
+ * `polling` : le flux temps réel est tombé mais la table reste jouable, le
+ * client allant chercher l'état à intervalle court. Mode dégradé assumé —
+ * sans animations de vol — plutôt qu'un écran figé.
+ */
+export type ConnectionStatus =
+  | 'connecting'
+  | 'live'
+  | 'reconnecting'
+  | 'polling'
+  | 'gone';
 
 export interface RoomHandle {
   view: PlayerView | null;
@@ -22,6 +32,10 @@ export interface RoomHandle {
 }
 
 const MAX_BACKOFF = 8000;
+/** Intervalle du filet de sécurité quand le flux temps réel reste coupé. */
+const POLL_MS = 2500;
+/** Nombre d'échecs de flux avant de basculer sur le filet de sécurité. */
+const POLL_AFTER_FAILURES = 2;
 
 /**
  * Connexion temps réel à une salle.
@@ -41,7 +55,14 @@ export function useRoom(code: string): RoomHandle {
   const sourceRef = useRef<EventSource | null>(null);
   const retryRef = useRef(0);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const aliveRef = useRef(true);
+
+  const stopPolling = useCallback(() => {
+    if (!pollTimer.current) return;
+    clearInterval(pollTimer.current);
+    pollTimer.current = null;
+  }, []);
 
   useEffect(() => {
     setSession(loadSession(code));
@@ -55,6 +76,7 @@ export function useRoom(code: string): RoomHandle {
         setClockSkew(skew);
         setView(message.view);
         setStatus('live');
+        stopPolling();
         retryRef.current = 0;
         if (message.events.length > 0) {
           setEvents((current) => [...current, ...message.events].slice(-60));
@@ -71,7 +93,32 @@ export function useRoom(code: string): RoomHandle {
         setStatus('gone');
         break;
     }
-  }, []);
+  }, [stopPolling]);
+
+  /** Filet de sécurité : un instantané vaut mieux qu'une table figée. */
+  const pollOnce = useCallback(async () => {
+    const stored = loadSession(code);
+    const query = stored ? `?token=${encodeURIComponent(stored.token)}` : '';
+    try {
+      const response = await fetch(`/api/rooms/${code}/state${query}`, { cache: 'no-store' });
+      if (!response.ok || !aliveRef.current) return;
+      const body = (await response.json()) as { view: PlayerView };
+      if (!aliveRef.current) return;
+      const skew = body.view.serverNow - Date.now();
+      skewRef.current = skew;
+      setClockSkew(skew);
+      setView(body.view);
+      setStatus((current) => (current === 'live' ? current : 'polling'));
+    } catch {
+      /* le prochain tour de boucle réessaiera */
+    }
+  }, [code]);
+
+  const startPolling = useCallback(() => {
+    if (pollTimer.current) return;
+    void pollOnce();
+    pollTimer.current = setInterval(() => void pollOnce(), POLL_MS);
+  }, [pollOnce]);
 
   const connect = useCallback(() => {
     if (!aliveRef.current) return;
@@ -93,13 +140,16 @@ export function useRoom(code: string): RoomHandle {
       source.close();
       sourceRef.current = null;
       if (!aliveRef.current) return;
-      setStatus('reconnecting');
+      setStatus((current) => (current === 'polling' ? current : 'reconnecting'));
+      // Le flux ne revient pas : on bascule sur les instantanés pour que la
+      // partie reste jouable, tout en continuant d'essayer de le rétablir.
+      if (retryRef.current >= POLL_AFTER_FAILURES) startPolling();
       // Repli exponentiel plafonné : on ne martèle jamais le serveur.
       const delay = Math.min(MAX_BACKOFF, 600 * 2 ** retryRef.current);
       retryRef.current = Math.min(retryRef.current + 1, 5);
       retryTimer.current = setTimeout(connect, delay);
     };
-  }, [code, handleMessage]);
+  }, [code, handleMessage, startPolling]);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -107,10 +157,11 @@ export function useRoom(code: string): RoomHandle {
     return () => {
       aliveRef.current = false;
       if (retryTimer.current) clearTimeout(retryTimer.current);
+      stopPolling();
       sourceRef.current?.close();
       sourceRef.current = null;
     };
-  }, [connect]);
+  }, [connect, stopPolling]);
 
   // Un onglet remis au premier plan après une mise en veille doit resynchroniser tout de suite.
   useEffect(() => {
@@ -167,8 +218,9 @@ export function useRoom(code: string): RoomHandle {
 
   const leave = useCallback(() => {
     clearSession(code);
+    stopPolling();
     sourceRef.current?.close();
-  }, [code]);
+  }, [code, stopPolling]);
 
   return {
     view,

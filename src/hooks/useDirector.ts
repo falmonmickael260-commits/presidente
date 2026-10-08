@@ -30,6 +30,12 @@ interface DirectorOptions {
   reducedMotion: boolean;
   pileCardWidth: number;
   handCardWidth: number;
+  /**
+   * Le flux d'événements est coupé (mode secours) : plus rien n'annonce la
+   * fermeture d'un pli, c'est donc la vue serveur qui fait autorité sur ce
+   * qui reste visible au centre.
+   */
+  authoritativePile?: boolean;
 }
 
 export interface Director {
@@ -64,6 +70,7 @@ export function useDirector({
   reducedMotion,
   pileCardWidth,
   handCardWidth,
+  authoritativePile = false,
 }: DirectorOptions): Director {
   const [flights, setFlights] = useState<Flight[]>([]);
   const [tableSets, setTableSets] = useState<PlayedSet[]>([]);
@@ -469,13 +476,15 @@ export function useDirector({
   }, [view]);
 
   // Le serveur peut vider le pli sans qu'aucun événement de fermeture n'ait été
-  // reçu (reconnexion en cours de pli) : on nettoie alors la table.
+  // reçu (reconnexion en cours de pli) : on nettoie alors la table. En mode
+  // secours, aucun événement n'arrive plus du tout : la vue fait autorité même
+  // en pleine manche, sinon les cartes d'un pli fermé resteraient au centre.
   useEffect(() => {
     if (!view) return;
-    if (view.pile.length === 0 && view.phase !== 'playing' && tableSetsRef.current.length > 0) {
-      clearTable();
-    }
-  }, [view, clearTable]);
+    if (tableSetsRef.current.length === 0) return;
+    if (view.pile.length > 0) return;
+    if (view.phase !== 'playing' || authoritativePile) clearTable();
+  }, [view, clearTable, authoritativePile]);
 
   useEffect(() => () => clearTable(), [clearTable]);
 

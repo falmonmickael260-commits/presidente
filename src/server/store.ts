@@ -20,6 +20,16 @@ const EVENT_HISTORY = 80;
 const BOT_MIN_DELAY = 750;
 const BOT_MAX_DELAY = 1700;
 const LOBBY_DROP_GRACE_MS = 12000;
+/**
+ * Délai avant de déclarer un joueur absent quand son flux se coupe.
+ *
+ * Une coupure de SSE est presque toujours une micro-coupure : onglet mis en
+ * arrière-plan sur mobile, changement de réseau, proxy qui recycle la
+ * connexion. Le client se reconnecte en quelques secondes. Sans ce délai, le
+ * moindre creux réseau marquait le joueur hors ligne et ramenait son tour à
+ * {@link DISCONNECTED_TURN_MS} — il passait tout seul avant d'avoir pu revenir.
+ */
+const PRESENCE_GRACE_MS = 10000;
 
 export interface Subscriber {
   id: string;
@@ -363,11 +373,7 @@ export function canStart(room: Room): boolean {
 export function attach(room: Room, subscriber: Subscriber) {
   room.subscribers.add(subscriber);
   if (subscriber.playerId) {
-    const pending = room.dropTimers.get(subscriber.playerId);
-    if (pending) {
-      clearTimeout(pending);
-      room.dropTimers.delete(subscriber.playerId);
-    }
+    clearPresenceTimeout(room, subscriber.playerId);
     const before = room.state;
     room.state = setConnected(room.state, subscriber.playerId, true);
     if (before !== room.state) commit(room, []);
@@ -376,30 +382,72 @@ export function attach(room: Room, subscriber: Subscriber) {
   subscriber.send({ type: 'sync', view, events: [], seq: room.seq });
 }
 
+/**
+ * Signale qu'un joueur est bel et bien là, sans passer par le flux temps réel.
+ *
+ * Le mode secours du client (instantanés toutes les 2,5 s) et chacune de ses
+ * actions passent par ici : sans cela, un joueur qui joue par ce chemin serait
+ * déclaré absent au bout du délai de grâce, et son tour raccourci à
+ * {@link DISCONNECTED_TURN_MS} alors qu'il est devant son écran.
+ */
+export function touchPresence(room: Room, playerId: string | null) {
+  if (!playerId) return;
+  const before = room.state;
+  room.state = setConnected(room.state, playerId, true);
+  if (before !== room.state) commit(room, []);
+  // La présence par instantanés est un bail qui s'épuise : sans nouvelle
+  // manifestation, le joueur redevient absent au bout du délai de grâce.
+  // Un flux temps réel ouvert, lui, se suffit à lui-même.
+  if (hasStream(room, playerId)) clearPresenceTimeout(room, playerId);
+  else armPresenceTimeout(room, playerId);
+}
+
 export function detach(room: Room, subscriber: Subscriber) {
   room.subscribers.delete(subscriber);
   const playerId = subscriber.playerId;
   if (!playerId) return;
+  if (hasStream(room, playerId)) return;
+  // On laisse au client le temps de se reconnecter avant de l'annoncer absent.
+  armPresenceTimeout(room, playerId);
+}
 
-  const stillOpen = Array.from(room.subscribers).some((s) => s.playerId === playerId);
-  if (stillOpen) return;
+function hasStream(room: Room, playerId: string): boolean {
+  return Array.from(room.subscribers).some((s) => s.playerId === playerId);
+}
 
-  room.state = setConnected(room.state, playerId, false);
-  commit(room, []);
+function clearPresenceTimeout(room: Room, playerId: string) {
+  const pending = room.dropTimers.get(playerId);
+  if (!pending) return;
+  clearTimeout(pending);
+  room.dropTimers.delete(playerId);
+}
 
-  // Dans le salon d'attente, un joueur qui ferme l'onglet libère sa place.
-  if (room.state.phase === 'lobby') {
-    const timer = setTimeout(() => {
-      room.dropTimers.delete(playerId);
-      const player = room.state.players.find((p) => p.id === playerId);
-      if (!player || player.connected) return;
-      room.state = removePlayer(room.state, playerId);
-      for (const [token, id] of room.tokens) {
-        if (id === playerId) room.tokens.delete(token);
-      }
-      commit(room, []);
-    }, LOBBY_DROP_GRACE_MS);
-    timer.unref?.();
-    room.dropTimers.set(playerId, timer);
-  }
+function armPresenceTimeout(room: Room, playerId: string) {
+  clearPresenceTimeout(room, playerId);
+  const timer = setTimeout(() => {
+    room.dropTimers.delete(playerId);
+    if (hasStream(room, playerId)) return;
+    room.state = setConnected(room.state, playerId, false);
+    commit(room, []);
+    scheduleLobbyDrop(room, playerId);
+  }, PRESENCE_GRACE_MS);
+  timer.unref?.();
+  room.dropTimers.set(playerId, timer);
+}
+
+/** Dans le salon d'attente, un joueur parti pour de bon libère sa place. */
+function scheduleLobbyDrop(room: Room, playerId: string) {
+  if (room.state.phase !== 'lobby') return;
+  const timer = setTimeout(() => {
+    room.dropTimers.delete(playerId);
+    const player = room.state.players.find((p) => p.id === playerId);
+    if (!player || player.connected) return;
+    room.state = removePlayer(room.state, playerId);
+    for (const [token, id] of room.tokens) {
+      if (id === playerId) room.tokens.delete(token);
+    }
+    commit(room, []);
+  }, LOBBY_DROP_GRACE_MS);
+  timer.unref?.();
+  room.dropTimers.set(playerId, timer);
 }

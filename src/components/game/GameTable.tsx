@@ -92,6 +92,7 @@ export function GameTable({
     reducedMotion,
     pileCardWidth: cardWidth,
     handCardWidth: cardWidth,
+    authoritativePile: room.status === 'polling',
   });
 
   useEffect(() => {
@@ -386,6 +387,21 @@ export function GameTable({
         </AnimatePresence>
       </div>
 
+      {/* L'avis de connexion vit dans le flux : posé par-dessus, il masquerait
+          la main au moment précis où le joueur en a le plus besoin. */}
+      {(room.status === 'reconnecting' || room.status === 'polling') && (
+        <div className="relative z-20 flex shrink-0 justify-center px-3 pt-1">
+          <span
+            role="status"
+            className="rounded-full border border-amber-300/30 bg-ink-950/80 px-3.5 py-1 text-[0.7rem] font-semibold text-amber-200 backdrop-blur"
+          >
+            {room.status === 'polling'
+              ? 'Mode secours — vous pouvez continuer à jouer'
+              : 'Reconnexion en cours…'}
+          </span>
+        </div>
+      )}
+
       {/* --------------------------- Barre d'action -------------------------- */}
       <div className="relative z-20 shrink-0 py-1.5">
         <ActionBar
@@ -453,13 +469,6 @@ export function GameTable({
         />
       )}
 
-      {room.status === 'reconnecting' && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[80] flex justify-center pb-2">
-          <span className="rounded-full border border-amber-300/30 bg-ink-950/90 px-4 py-1.5 text-[0.72rem] font-semibold text-amber-200 backdrop-blur">
-            Reconnexion en cours…
-          </span>
-        </div>
-      )}
     </div>
   );
 }
