@@ -34,12 +34,15 @@ export function useHandSelection({
   pendingTransfer,
   tableTop,
   mustPlayQueen,
+  skipThreat,
 }: {
   view: PlayerView | null;
   exchangeMode: boolean;
   pendingTransfer: PublicTransfer | null;
   tableTop: TableTop | null;
   mustPlayQueen: boolean;
+  /** Valeur dominante reposée : seule cette valeur peut encore être jouée. */
+  skipThreat: boolean;
 }): HandSelection {
   const [selected, setSelected] = useState<string[]>([]);
   const hand = view?.hand ?? [];
@@ -110,6 +113,12 @@ export function useHandSelection({
         text: `Il faut poser ${tableTop.count} carte${tableTop.count > 1 ? 's' : ''}`,
       };
     }
+    if (skipThreat && tableTop && combo.rank !== tableTop.rank) {
+      return {
+        valid: false,
+        text: `Seul ${comboLabel(tableTop.rank, tableTop.count)} passe — sinon sautez`,
+      };
+    }
     if (tableTop && !canBeat(combo, tableTop, view.settings.allowEqualRank)) {
       return {
         valid: false,
@@ -120,7 +129,16 @@ export function useHandSelection({
       return { valid: false, text: 'La Dame de pique doit ouvrir la partie' };
     }
     return { valid: true, text: `${comboLabel(combo.rank, combo.count)} — prêt` };
-  }, [view, exchangeMode, pendingTransfer, selected, cards, tableTop, mustPlayQueen]);
+  }, [
+    view,
+    exchangeMode,
+    pendingTransfer,
+    selected,
+    cards,
+    tableTop,
+    mustPlayQueen,
+    skipThreat,
+  ]);
 
   const clear = useCallback(() => setSelected([]), []);
 

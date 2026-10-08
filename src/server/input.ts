@@ -34,7 +34,12 @@ export function sanitizeCardIds(raw: unknown): string[] | null {
 export function sanitizeSettings(raw: unknown) {
   if (typeof raw !== 'object' || raw === null) return {};
   const value = raw as Record<string, unknown>;
-  const out: { turnSeconds?: number; rounds?: number; allowEqualRank?: boolean } = {};
+  const out: {
+    turnSeconds?: number;
+    rounds?: number;
+    allowEqualRank?: boolean;
+    skipOnEqual?: boolean;
+  } = {};
   if (typeof value.turnSeconds === 'number' && Number.isFinite(value.turnSeconds)) {
     out.turnSeconds = value.turnSeconds;
   }
@@ -42,6 +47,7 @@ export function sanitizeSettings(raw: unknown) {
     out.rounds = value.rounds;
   }
   if (typeof value.allowEqualRank === 'boolean') out.allowEqualRank = value.allowEqualRank;
+  if (typeof value.skipOnEqual === 'boolean') out.skipOnEqual = value.skipOnEqual;
   return out;
 }
 

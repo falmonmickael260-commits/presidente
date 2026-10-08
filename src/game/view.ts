@@ -57,6 +57,11 @@ export interface PlayerView {
   phaseEndsAt: number | null;
   exchange: { transfers: PublicTransfer[]; deadline: number | null } | null;
   mustOpenWithQueenOfSpades: boolean;
+  /**
+   * La valeur dominante vient d'être reposée : le joueur courant ne peut que
+   * reposer cette même valeur, ou sauter son tour.
+   */
+  skipThreat: boolean;
   version: number;
   /** Identifiants des cartes jouables immédiatement (aide visuelle). */
   playableCardIds: string[];
@@ -93,6 +98,7 @@ function computePlayable(state: GameState, viewerId: string | null): string[] {
   const combos = legalCombos(player.hand, getTableTop(state), {
     allowEqualRank: state.settings.allowEqualRank,
     requireQueenOfSpades: state.mustOpenWithQueenOfSpades && state.pile.length === 0,
+    exactRankOnly: state.skipThreat,
   });
   const ids = new Set<string>();
   for (const combo of combos) {
@@ -158,6 +164,7 @@ export function buildPlayerView(
     phaseEndsAt: state.phaseEndsAt,
     exchange,
     mustOpenWithQueenOfSpades: state.mustOpenWithQueenOfSpades,
+    skipThreat: state.skipThreat,
     version: state.version,
     playableCardIds: computePlayable(state, viewerId ?? null),
     serverNow: now,

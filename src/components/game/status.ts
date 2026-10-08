@@ -41,8 +41,17 @@ export function buildStatusText({
 
   if (isYourTurn) {
     if (mustPlayQueen) return 'À vous — posez la Dame de pique';
+    // Sous la menace, dire exactement ce qui reste possible évite de chercher.
+    if (view.skipThreat && tableTop) {
+      return `${comboLabel(tableTop.rank, tableTop.count)} ou vous sautez votre tour`;
+    }
     if (!tableTop) return 'À vous — repartez comme vous voulez';
     return 'À vous de jouer';
+  }
+
+  if (view.skipThreat && tableTop) {
+    const who = currentPlayer?.name ?? 'Le joueur suivant';
+    return `${who} doit reposer ${comboLabel(tableTop.rank, tableTop.count)} ou sauter`;
   }
 
   return `Au tour ${withElision(currentPlayer?.name)}`;

@@ -33,7 +33,16 @@ export function decideBotAction(state: GameState, botId: string): GameAction | n
   const options = legalCombos(bot.hand, top, {
     allowEqualRank: state.settings.allowEqualRank,
     requireQueenOfSpades: mustQueen,
+    exactRankOnly: state.skipThreat,
   });
+
+  if (state.skipThreat) {
+    // Menace de saut : reposer la valeur exacte est toujours préférable — on
+    // se défait de cartes, on reste maître du pli et le saut glisse au suivant.
+    const match = options[0];
+    if (!match) return { type: 'skip', playerId: botId };
+    return { type: 'play', playerId: botId, cardIds: match.cards.map((c) => c.id) };
+  }
 
   if (options.length === 0) {
     return top ? { type: 'pass', playerId: botId } : null;

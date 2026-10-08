@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from '@/game/engine';
 import type { GameState } from '@/game/types';
 
 /**
@@ -54,6 +55,19 @@ export async function saveRoom(
   }
 }
 
+/**
+ * Une salle écrite par une version antérieure peut manquer des champs ajoutés
+ * depuis. On réapplique les valeurs par défaut plutôt que de laisser un `undefined`
+ * désactiver silencieusement une règle.
+ */
+function hydrate(state: GameState): GameState {
+  return {
+    ...state,
+    settings: { ...DEFAULT_SETTINGS, ...state.settings },
+    skipThreat: state.skipThreat ?? false,
+  };
+}
+
 export async function loadRoom(
   code: string,
 ): Promise<{ state: GameState; tokens: Record<string, string> } | null> {
@@ -67,7 +81,7 @@ export async function loadRoom(
     const rows = (await response.json()) as RoomRow[];
     const row = rows[0];
     if (!row) return null;
-    return { state: row.state, tokens: row.tokens ?? {} };
+    return { state: hydrate(row.state), tokens: row.tokens ?? {} };
   } catch {
     return null;
   }

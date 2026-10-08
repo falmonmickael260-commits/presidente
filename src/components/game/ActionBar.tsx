@@ -11,13 +11,15 @@ interface ActionBarProps {
   selectionValid: boolean;
   primaryLabel: string;
   canPlay: boolean;
-  canPass: boolean;
   onPlay: () => void;
-  onPass: () => void;
+  /** Action de repli : « Passer », ou « Sauter » sous la menace du saut. */
+  secondaryLabel: string;
+  canSecondary: boolean;
+  onSecondary: () => void;
   onClear: () => void;
   hasSelection: boolean;
-  /** Masque « Passer » là où l'action n'a aucun sens (phase d'échange). */
-  showPass: boolean;
+  /** Masque le repli là où l'action n'a aucun sens (phase d'échange). */
+  showSecondary: boolean;
   /** Pastille du joueur local (avatar + chrono), rendue à gauche du statut. */
   badge: React.ReactNode;
 }
@@ -34,12 +36,13 @@ export function ActionBar({
   selectionValid,
   primaryLabel,
   canPlay,
-  canPass,
   onPlay,
-  onPass,
+  secondaryLabel,
+  canSecondary,
+  onSecondary,
   onClear,
   hasSelection,
-  showPass,
+  showSecondary,
   badge,
 }: ActionBarProps) {
   const buttons = (
@@ -64,15 +67,15 @@ export function ActionBar({
           </motion.div>
         )}
       </AnimatePresence>
-      {showPass && (
+      {showSecondary && (
         <Button
           size="md"
           variant="secondary"
-          onClick={onPass}
-          disabled={!canPass}
+          onClick={onSecondary}
+          disabled={!canSecondary}
           className="flex-1 sm:flex-none"
         >
-          Passer
+          {secondaryLabel}
         </Button>
       )}
       {/* Une seule impulsion quand le coup devient jouable. Une pulsation en

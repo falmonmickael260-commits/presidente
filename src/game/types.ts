@@ -92,6 +92,13 @@ export interface GameSettings {
   turnSeconds: number;
   /** Autorise de reposer la même valeur (nécessaire aux carrés cumulés). */
   allowEqualRank: boolean;
+  /**
+   * Reposer la même valeur **sur une carte seule** fait sauter son tour au
+   * joueur suivant — sauf si celui-ci repose à son tour cette valeur, ce qui
+   * reporte le saut sur le joueur d'après. Les paires et les brelans se
+   * jouent normalement. N'a de sens que si `allowEqualRank` est actif.
+   */
+  skipOnEqual: boolean;
   /** Nombre de manches de la partie. */
   rounds: number;
 }
@@ -124,6 +131,12 @@ export interface GameState {
   seed: number;
   /** Le premier pli de la toute première manche doit contenir la Dame de pique. */
   mustOpenWithQueenOfSpades: boolean;
+  /**
+   * Le joueur courant est sous la menace du saut : il ne peut que reposer
+   * exactement la même valeur (carte seule), ou laisser passer son tour.
+   * Contrairement à un « passe », sauter ne le sort pas du pli.
+   */
+  skipThreat: boolean;
   createdAt: number;
 }
 
@@ -135,6 +148,7 @@ export type GameAction =
   | { type: 'start_game'; playerId: string }
   | { type: 'play'; playerId: string; cardIds: CardId[] }
   | { type: 'pass'; playerId: string }
+  | { type: 'skip'; playerId: string }
   | { type: 'exchange_give'; playerId: string; cardIds: CardId[] }
   | { type: 'next_round'; playerId: string }
   | { type: 'restart'; playerId: string }
@@ -172,6 +186,7 @@ export type GameEvent =
       isQueenOpening: boolean;
     }
   | { type: 'pass'; playerId: string }
+  | { type: 'skipped'; playerId: string; rank: Rank }
   | { type: 'carre'; playerId: string; rank: Rank }
   | {
       type: 'trick_won';

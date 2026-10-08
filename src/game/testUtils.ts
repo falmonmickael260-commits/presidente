@@ -23,12 +23,20 @@ export function gameWithPlayers(count: number, seed = 1): GameState {
 /** Démarre une manche puis force des mains précises, pour des scénarios déterministes. */
 export function playingGame(
   hands: Record<string, string[]>,
-  options?: { startWith?: string; allowEqualRank?: boolean; roundNumber?: number },
+  options?: {
+    startWith?: string;
+    allowEqualRank?: boolean;
+    skipOnEqual?: boolean;
+    roundNumber?: number;
+  },
 ): GameState {
   const ids = Object.keys(hands);
   let state = gameWithPlayers(ids.length);
   if (options?.allowEqualRank !== undefined) {
     state = { ...state, settings: { ...state.settings, allowEqualRank: options.allowEqualRank } };
+  }
+  if (options?.skipOnEqual !== undefined) {
+    state = { ...state, settings: { ...state.settings, skipOnEqual: options.skipOnEqual } };
   }
   const started = startRound(state, 0).state;
   let next: GameState = {
@@ -60,4 +68,8 @@ export function play(state: GameState, playerId: string, ...cardIds: string[]) {
 
 export function pass(state: GameState, playerId: string) {
   return reduce(state, { type: 'pass', playerId }, 1000);
+}
+
+export function skip(state: GameState, playerId: string) {
+  return reduce(state, { type: 'skip', playerId }, 1000);
 }

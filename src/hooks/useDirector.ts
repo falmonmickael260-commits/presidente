@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { parseCardId } from '@/game/cards';
+import { parseCardId, rankName } from '@/game/cards';
 import type { Card, PlayedSet, Rank, StampedEvent } from '@/game/types';
 import type { PlayerView } from '@/game/view';
 import { haptic } from '@/lib/haptics';
@@ -391,6 +391,18 @@ export function useDirector({
           case 'pass':
             sound().play('pass');
             break;
+
+          case 'skipped': {
+            if (event.playerId === current?.youId) {
+              pushNotice(`Tour sauté — pas de ${rankName(event.rank)} à reposer`, 'warn');
+            } else {
+              const name =
+                current?.players.find((p) => p.id === event.playerId)?.name ?? 'Un joueur';
+              pushNotice(`${name} saute son tour`, 'neutral');
+            }
+            sound().play('pass');
+            break;
+          }
 
           case 'timeout':
             if (event.playerId === current?.youId) {

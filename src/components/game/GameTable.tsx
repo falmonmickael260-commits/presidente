@@ -147,12 +147,17 @@ export function GameTable({
     view?.mustOpenWithQueenOfSpades && view.pile.length === 0 && isYourTurn,
   );
 
+  // La valeur dominante vient d'être reposée : le joueur du tour ne peut que
+  // la reposer à son tour — sinon il saute, sans pour autant quitter le pli.
+  const skipThreat = Boolean(view?.skipThreat && view.phase === 'playing');
+
   const selection = useHandSelection({
     view,
     exchangeMode,
     pendingTransfer,
     tableTop,
     mustPlayQueen,
+    skipThreat,
   });
 
   const playSelected = useCallback(async () => {
@@ -173,11 +178,12 @@ export function GameTable({
     }
   }, [selection, read, director, room, exchangeMode]);
 
-  const passTurn = useCallback(async () => {
+  // Repli : « passer » quitte le pli, « sauter » laisse juste filer le tour.
+  const foldTurn = useCallback(async () => {
     selection.clear();
-    const ok = await room.send('pass');
+    const ok = await room.send(skipThreat ? 'skip' : 'pass');
     if (!ok) sound().play('error');
-  }, [room, selection]);
+  }, [room, selection, skipThreat]);
 
   const toggleSound = useCallback(() => {
     const next = !sound().isEnabled();
@@ -188,7 +194,8 @@ export function GameTable({
 
   const canPlay =
     selection.check.valid && (exchangeMode || (isYourTurn && view?.phase === 'playing'));
-  const canPass = isYourTurn && view?.phase === 'playing' && view.pile.length > 0;
+  // Sauter comme passer n'ont de sens qu'avec une combinaison sur la table.
+  const canFold = isYourTurn && view?.phase === 'playing' && view.pile.length > 0;
 
   /* Raccourcis clavier : le jeu reste jouable sans souris. */
   useEffect(() => {
@@ -197,16 +204,16 @@ export function GameTable({
       if (event.key === 'Enter' && canPlay) {
         event.preventDefault();
         void playSelected();
-      } else if ((event.key === 'p' || event.key === 'P') && canPass) {
+      } else if ((event.key === 'p' || event.key === 'P') && canFold) {
         event.preventDefault();
-        void passTurn();
+        void foldTurn();
       } else if (event.key === 'Escape') {
         selection.clear();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [canPlay, canPass, playSelected, passTurn, selection]);
+  }, [canPlay, canFold, playSelected, foldTurn, selection]);
 
   if (!view) return null;
 
@@ -383,12 +390,13 @@ export function GameTable({
           selectionValid={selection.check.valid}
           primaryLabel={exchangeMode ? 'Donner' : 'Jouer'}
           canPlay={canPlay}
-          canPass={canPass}
           onPlay={playSelected}
-          onPass={passTurn}
+          secondaryLabel={skipThreat ? 'Sauter' : 'Passer'}
+          canSecondary={canFold}
+          onSecondary={foldTurn}
           onClear={selection.clear}
           hasSelection={selection.selected.length > 0}
-          showPass={!exchangeMode}
+          showSecondary={!exchangeMode}
           badge={<MySeatBadge view={view} skew={room.clockSkew} isYourTurn={isYourTurn} />}
         />
       </div>

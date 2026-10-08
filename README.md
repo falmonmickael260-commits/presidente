@@ -43,6 +43,7 @@ Depuis le salon, l'hôte peut **ajouter des bots** : il suffit de trois joueurs
 | Ouverture | manche 1 : le porteur de la **Dame de pique** commence et doit la poser |
 | Passer | définitif pour le pli en cours |
 | Fermeture | quand tous les autres ont passé, le dernier poseur reprend la main **avec la combinaison de son choix** |
+| Saut | sur une **carte seule**, reposer la valeur de la table fait sauter le joueur suivant — sauf s'il repose lui aussi cette valeur, et le saut glisse d'un cran. Sauter ne sort pas du pli. Les paires et brelans ne sont pas concernés |
 | Carré | dès que les 4 cartes d'une valeur sont sur la table, le pli est fermé immédiatement et le poseur de la 4ᵉ reprend la main |
 | Classement | 👑 Président · 🥈 Vice-Président · … · 💩 Trou du Cul |
 | Échange | Trou du Cul → Président : 2 meilleures cartes, retour de 2 cartes au choix. Vice-Trou → Vice-Président : 1 meilleure carte, retour de 1 carte au choix |

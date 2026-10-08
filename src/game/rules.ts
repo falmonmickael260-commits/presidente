@@ -87,7 +87,9 @@ export type MoveRejection =
   | 'wrong_count'
   | 'too_weak'
   | 'must_open_with_queen'
-  | 'cannot_pass_on_free_hand';
+  | 'must_match_rank'
+  | 'cannot_pass_on_free_hand'
+  | 'no_skip_pending';
 
 export interface MoveCheckOk {
   ok: true;
@@ -112,7 +114,9 @@ const MESSAGES: Record<MoveRejection, string> = {
   wrong_count: 'Vous devez poser le même nombre de cartes que le pli en cours.',
   too_weak: 'Votre combinaison doit être plus forte que celle sur la table.',
   must_open_with_queen: 'La partie démarre sur la Dame de pique : elle doit être posée.',
+  must_match_rank: 'Vous ne pouvez que reposer la même valeur, ou sauter votre tour.',
   cannot_pass_on_free_hand: 'Vous avez la main : vous devez poser une combinaison.',
+  no_skip_pending: "Vous n'êtes pas sous la menace du saut.",
 };
 
 function reject(reason: MoveRejection, message?: string): MoveCheckError {
@@ -171,6 +175,14 @@ export function validatePlay(
     );
   }
 
+  // Sous la menace du saut, la seule pose possible est la valeur exacte.
+  if (state.skipThreat && top && combo.rank !== top.rank) {
+    return reject(
+      'must_match_rank',
+      `Il faut reposer ${comboLabel(top.rank, top.count)} ou sauter votre tour.`,
+    );
+  }
+
   if (
     state.mustOpenWithQueenOfSpades &&
     state.pile.length === 0 &&
@@ -182,15 +194,37 @@ export function validatePlay(
   return { ok: true, combo };
 }
 
-export function validatePass(state: GameState, playerId: string): MoveCheck | MoveCheckError {
+/** Combinaison vide : « passer » et « sauter » ne posent aucune carte. */
+function emptyCombo(): Combo {
+  return { kind: 'single', rank: 3, count: 0, cards: [] };
+}
+
+function checkTurn(state: GameState, playerId: string): MoveCheckError | null {
   if (state.phase !== 'playing') return reject('not_playing');
   const player = findPlayer(state, playerId);
   if (!player) return reject('not_your_turn');
   if (player.finishPosition !== null) return reject('already_finished');
   if (state.currentPlayerId !== playerId) return reject('not_your_turn');
   if (player.passed) return reject('already_passed');
+  return null;
+}
+
+export function validatePass(state: GameState, playerId: string): MoveCheck {
+  const turn = checkTurn(state, playerId);
+  if (turn) return turn;
   if (state.pile.length === 0) return reject('cannot_pass_on_free_hand');
-  return { ok: true, combo: { kind: 'single', rank: 3, count: 0, cards: [] } };
+  // Sous la menace du saut, c'est « sauter » qu'il faut jouer, pas « passer » :
+  // sauter ne sort pas du pli, passer si.
+  if (state.skipThreat) return reject('must_match_rank');
+  return { ok: true, combo: emptyCombo() };
+}
+
+/** Accepter le saut : le joueur perd son tour mais reste dans le pli. */
+export function validateSkip(state: GameState, playerId: string): MoveCheck {
+  const turn = checkTurn(state, playerId);
+  if (turn) return turn;
+  if (!state.skipThreat) return reject('no_skip_pending');
+  return { ok: true, combo: emptyCombo() };
 }
 
 /**
@@ -200,7 +234,12 @@ export function validatePass(state: GameState, playerId: string): MoveCheck | Mo
 export function legalCombos(
   hand: readonly Card[],
   top: TableTop | null,
-  options: { allowEqualRank: boolean; requireQueenOfSpades?: boolean },
+  options: {
+    allowEqualRank: boolean;
+    requireQueenOfSpades?: boolean;
+    /** Sous la menace du saut : seule la valeur exacte est jouable. */
+    exactRankOnly?: boolean;
+  },
 ): Combo[] {
   const byRank = new Map<Rank, Card[]>();
   for (const card of hand) {
@@ -211,6 +250,7 @@ export function legalCombos(
 
   const result: Combo[] = [];
   for (const [rank, cards] of byRank) {
+    if (options.exactRankOnly && top && rank !== top.rank) continue;
     const maxCount = cards.length;
     const counts = top ? [top.count] : [1, 2, 3, 4];
     for (const count of counts) {

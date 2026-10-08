@@ -8,6 +8,7 @@ import {
   legalCombos,
   validatePass,
   validatePlay,
+  validateSkip,
   worstCards,
 } from './rules';
 import type {
@@ -35,6 +36,7 @@ export const DISCONNECTED_TURN_MS = 6000;
 export const DEFAULT_SETTINGS: GameSettings = {
   turnSeconds: 30,
   allowEqualRank: true,
+  skipOnEqual: true,
   rounds: 3,
 };
 
@@ -69,6 +71,7 @@ export function createGame(options?: {
     version: 0,
     seed: options?.seed ?? ((Date.now() & 0x7fffffff) || 1),
     mustOpenWithQueenOfSpades: true,
+    skipThreat: false,
     createdAt: options?.now ?? Date.now(),
   };
 }
@@ -230,6 +233,7 @@ export function startRound(state: GameState, now: number): ReduceResult {
     phaseEndsAt: now + DEAL_MS,
     seed: nextSeed(state.seed),
     mustOpenWithQueenOfSpades: roundNumber === 1,
+    skipThreat: false,
   };
 
   events.push({ type: 'round_start', roundNumber, hands: perPlayer });
@@ -419,6 +423,7 @@ function startPlaying(
     pile: [],
     requiredCount: null,
     lastPlayerId: null,
+    skipThreat: false,
     players: state.players.map((p) => ({ ...p, passed: false })),
   };
   next = setTurn(next, opening, now, events);
@@ -443,6 +448,7 @@ function closeTrick(
     pile: [],
     requiredCount: null,
     lastPlayerId: null,
+    skipThreat: false,
     players: state.players.map((p) => ({ ...p, passed: false })),
   };
 
@@ -498,6 +504,7 @@ function endRound(state: GameState, now: number, events: GameEvent[]): ReduceRes
     turnTotalMs: null,
     phaseEndsAt: isLastRound ? null : now + ROUND_END_MS,
     mustOpenWithQueenOfSpades: false,
+    skipThreat: false,
   };
 
   events.push({ type: 'round_end', standings });
@@ -565,6 +572,8 @@ function doPlay(
   const ids = new Set(cardIds);
   const combo = check.combo;
   const setId = `${state.version}-${playerId}-${state.pile.length}`;
+  // Valeur à battre AVANT cette pose : c'est elle qui décide du saut.
+  const previousTop = getTableTop(state);
 
   let players = state.players.map((p) =>
     p.id === playerId ? { ...p, hand: p.hand.filter((c) => !ids.has(c.id)) } : p,
@@ -597,6 +606,17 @@ function doPlay(
     requiredCount: state.requiredCount ?? combo.count,
     lastPlayerId: playerId,
     mustOpenWithQueenOfSpades: false,
+    // Reposer la même valeur fait sauter le joueur suivant, à moins qu'il ne
+    // repose lui aussi cette valeur — auquel cas le saut glisse d'un cran.
+    // La règle ne vaut que pour les cartes seules : sur les paires et les
+    // brelans on joue normalement, et quatre cartes de même valeur ferment
+    // le pli (carré), ce qui se substitue au saut.
+    skipThreat:
+      state.settings.skipOnEqual &&
+      previousTop !== null &&
+      previousTop.count === 1 &&
+      combo.count === 1 &&
+      combo.rank === previousTop.rank,
   };
 
   const actor = findPlayer(next, playerId);
@@ -613,6 +633,18 @@ function doPlay(
   return afterMove(next, playerId, now, events);
 }
 
+/** Le joueur sous menace laisse filer son tour : il reste dans le pli. */
+function doSkip(state: GameState, playerId: string, now: number): ReduceResult {
+  const check = validateSkip(state, playerId);
+  if (!check.ok) return { state, events: [] };
+
+  // La menace n'existe que si une valeur est sur la table : `top` est non nul.
+  const top = getTableTop(state);
+  if (!top) return { state, events: [] };
+  const events: GameEvent[] = [{ type: 'skipped', playerId, rank: top.rank }];
+  return afterMove({ ...state, skipThreat: false }, playerId, now, events);
+}
+
 function doPass(state: GameState, playerId: string, now: number): ReduceResult {
   const check = validatePass(state, playerId);
   if (!check.ok) return { state, events: [] };
@@ -620,6 +652,7 @@ function doPass(state: GameState, playerId: string, now: number): ReduceResult {
   const events: GameEvent[] = [{ type: 'pass', playerId }];
   const next: GameState = {
     ...state,
+    skipThreat: false,
     players: state.players.map((p) => (p.id === playerId ? { ...p, passed: true } : p)),
   };
   return afterMove(next, playerId, now, events);
@@ -630,6 +663,7 @@ export function autoMoveFor(state: GameState, playerId: string): GameAction {
   const player = findPlayer(state, playerId);
   const top = getTableTop(state);
   if (!player) return { type: 'pass', playerId };
+  if (state.skipThreat) return { type: 'skip', playerId };
   if (top) return { type: 'pass', playerId };
   const options = legalCombos(player.hand, null, {
     allowEqualRank: state.settings.allowEqualRank,
@@ -663,6 +697,9 @@ export function reduce(
 
     case 'pass':
       return doPass(state, action.playerId, now);
+
+    case 'skip':
+      return doSkip(state, action.playerId, now);
 
     case 'exchange_give': {
       if (state.phase !== 'exchange' || !state.exchange) return { state, events: [] };
@@ -716,6 +753,7 @@ export function reduce(
           turnTotalMs: null,
           phaseEndsAt: null,
           mustOpenWithQueenOfSpades: true,
+          skipThreat: false,
         }),
         events: [],
       };

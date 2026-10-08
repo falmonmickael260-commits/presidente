@@ -341,6 +341,7 @@ export function updateSettings(
       turnSeconds,
       rounds,
       allowEqualRank: settings.allowEqualRank ?? room.state.settings.allowEqualRank,
+      skipOnEqual: settings.skipOnEqual ?? room.state.settings.skipOnEqual,
     },
   };
   commit(room, []);

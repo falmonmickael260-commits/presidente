@@ -34,6 +34,15 @@ const SECTIONS: { title: string; lines: string[] }[] = [
     ],
   },
   {
+    title: 'Même valeur : le suivant saute',
+    lines: [
+      'Sur une carte seule, reposer exactement la valeur qui est sur la table fait sauter le joueur suivant.',
+      'Celui-ci garde une issue : reposer lui aussi cette valeur, et le saut glisse sur le joueur d’après.',
+      'S’il ne l’a pas, il saute son tour — mais il reste dans le pli et rejouera au tour suivant.',
+      'La règle ne concerne que les cartes seules : sur les paires et les brelans, on joue normalement.',
+    ],
+  },
+  {
     title: 'Carré',
     lines: [
       'Dès que les quatre cartes d’une même valeur sont sur la table, le pli est fermé immédiatement.',

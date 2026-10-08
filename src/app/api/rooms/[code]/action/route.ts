@@ -1,4 +1,4 @@
-import { validatePass, validatePlay } from '@/game/rules';
+import { validatePass, validatePlay, validateSkip } from '@/game/rules';
 import { buildPlayerView } from '@/game/view';
 import { normalizeRoomCode } from '@/server/codes';
 import { jsonError, readJson, sanitizeCardIds, sanitizeSettings } from '@/server/input';
@@ -74,6 +74,13 @@ function handle(
       const check = validatePass(room.state, playerId);
       if (!check.ok) return check.message;
       dispatch(room, { type: 'pass', playerId });
+      return null;
+    }
+
+    case 'skip': {
+      const check = validateSkip(room.state, playerId);
+      if (!check.ok) return check.message;
+      dispatch(room, { type: 'skip', playerId });
       return null;
     }
 

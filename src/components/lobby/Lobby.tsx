@@ -164,25 +164,22 @@ export function Lobby({ view, code, room, onLeave }: LobbyProps) {
                 />
               </SettingRow>
 
-              <label className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3">
-                <input
-                  type="checkbox"
-                  checked={view.settings.allowEqualRank}
-                  onChange={(event) =>
-                    act('settings', { settings: { allowEqualRank: event.target.checked } })
-                  }
-                  className="mt-0.5 h-4 w-4 accent-[#ecd08a]"
-                />
-                <span className="flex-1">
-                  <span className="block text-[0.88rem] font-semibold">
-                    Autoriser la valeur égale
-                  </span>
-                  <span className="block text-[0.74rem] leading-snug text-cream/45">
-                    Permet de reposer la même valeur, et donc de compléter un carré
-                    carte après carte (5 → 5 → 5 → 5).
-                  </span>
-                </span>
-              </label>
+              <ToggleRow
+                label="Autoriser la valeur égale"
+                hint="Permet de reposer la même valeur, et donc de compléter un carré carte après carte (5 → 5 → 5 → 5)."
+                checked={view.settings.allowEqualRank}
+                onChange={(checked) =>
+                  act('settings', { settings: { allowEqualRank: checked } })
+                }
+              />
+
+              <ToggleRow
+                label="Même valeur = le suivant saute"
+                hint="Sur une carte seule, reposer la valeur de la table fait sauter le joueur suivant — sauf s’il repose lui aussi cette valeur : le saut glisse alors d’un cran. Les paires ne sont pas concernées."
+                checked={view.settings.skipOnEqual}
+                disabled={!view.settings.allowEqualRank}
+                onChange={(checked) => act('settings', { settings: { skipOnEqual: checked } })}
+              />
             </div>
           </section>
         )}
@@ -217,6 +214,40 @@ export function Lobby({ view, code, room, onLeave }: LobbyProps) {
 
       <RulesSheet open={rulesOpen} onClose={() => setRulesOpen(false)} />
     </div>
+  );
+}
+
+function ToggleRow({
+  label,
+  hint,
+  checked,
+  disabled = false,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label
+      className={`flex items-start gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3 ${
+        disabled ? 'opacity-45' : ''
+      }`}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+        className="mt-0.5 h-4 w-4 accent-[#ecd08a]"
+      />
+      <span className="flex-1">
+        <span className="block text-[0.88rem] font-semibold">{label}</span>
+        <span className="block text-[0.74rem] leading-snug text-cream/45">{hint}</span>
+      </span>
+    </label>
   );
 }
 

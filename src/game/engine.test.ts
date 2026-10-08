@@ -14,7 +14,7 @@ import {
 import { decideBotAction } from './bot';
 import { buildPlayerView } from './view';
 import type { GameState } from './types';
-import { gameWithPlayers, pass, play, playingGame } from './testUtils';
+import { gameWithPlayers, pass, play, playingGame, skip } from './testUtils';
 
 const ids = (state: GameState, playerId: string) =>
   state.players.find((p) => p.id === playerId)!;
@@ -150,6 +150,188 @@ describe('carré', () => {
     expect(result.events.some((e) => e.type === 'carre')).toBe(true);
     expect(result.state.currentPlayerId).toBe('p3');
     expect(result.state.pile).toHaveLength(0);
+    // Le pli fermé désarme la menace de saut accumulée au fil des 5.
+    expect(result.state.skipThreat).toBe(false);
+  });
+});
+
+describe('saut sur valeur égale', () => {
+  it('reposer la même valeur arme le saut du joueur suivant', () => {
+    let state = playingGame({
+      p0: ['5H', '3S'],
+      p1: ['5S', '4H'],
+      p2: ['9D', '6C'],
+      p3: ['13C', '7C'],
+    });
+    state = play(state, 'p0', '5H').state;
+    expect(state.skipThreat).toBe(false);
+
+    state = play(state, 'p1', '5S').state;
+    expect(state.skipThreat).toBe(true);
+    expect(state.currentPlayerId).toBe('p2');
+  });
+
+  it('refuse toute autre valeur au joueur menacé, même plus forte', () => {
+    let state = playingGame({
+      p0: ['5H', '3S'],
+      p1: ['5S', '4H'],
+      p2: ['9D', '6C'],
+      p3: ['13C', '7C'],
+    });
+    state = play(state, 'p0', '5H').state;
+    state = play(state, 'p1', '5S').state;
+
+    const refused = play(state, 'p2', '9D');
+    expect(refused.state.pile).toHaveLength(2);
+    expect(refused.state.currentPlayerId).toBe('p2');
+
+    // Passer non plus : le saut ne fait pas sortir du pli.
+    expect(pass(state, 'p2').state.currentPlayerId).toBe('p2');
+  });
+
+  it('le joueur menacé qui saute reste dans le pli', () => {
+    let state = playingGame({
+      p0: ['5H', '3S'],
+      p1: ['5S', '4H'],
+      p2: ['9D', '6C'],
+      p3: ['13C', '7C'],
+    });
+    state = play(state, 'p0', '5H').state;
+    state = play(state, 'p1', '5S').state;
+
+    const skipped = skip(state, 'p2');
+    expect(skipped.events.some((e) => e.type === 'skipped')).toBe(true);
+    expect(skipped.state.players.find((p) => p.id === 'p2')!.passed).toBe(false);
+    expect(skipped.state.skipThreat).toBe(false);
+    expect(skipped.state.currentPlayerId).toBe('p3');
+
+    // p3 reprend la main, et p2 est bien rappelé au tour de table suivant.
+    let after = play(skipped.state, 'p3', '13C').state;
+    expect(after.currentPlayerId).toBe('p0');
+    after = pass(after, 'p0').state;
+    after = pass(after, 'p1').state;
+    expect(after.currentPlayerId).toBe('p2');
+  });
+
+  it('reposer à son tour la même valeur reporte le saut sur le joueur d’après', () => {
+    let state = playingGame({
+      p0: ['5H', '3S'],
+      p1: ['5S', '4H'],
+      p2: ['5D', '6C'],
+      p3: ['13C', '7C'],
+    });
+    state = play(state, 'p0', '5H').state;
+    state = play(state, 'p1', '5S').state;
+    state = play(state, 'p2', '5D').state;
+
+    expect(state.skipThreat).toBe(true);
+    expect(state.currentPlayerId).toBe('p3');
+    // p3 n'a pas de 5 : il ne peut que sauter.
+    expect(play(state, 'p3', '13C').state.currentPlayerId).toBe('p3');
+    expect(skip(state, 'p3').state.currentPlayerId).toBe('p0');
+  });
+
+  it('exige une carte seule : une paire ne répond pas à un 5 seul', () => {
+    let state = playingGame({
+      p0: ['5H', '3S'],
+      p1: ['5S', '4H'],
+      p2: ['5D', '5C', '6C'],
+    });
+    state = play(state, 'p0', '5H').state;
+    state = play(state, 'p1', '5S').state;
+    expect(state.skipThreat).toBe(true);
+
+    // p2 a deux 5, mais le pli est à une carte : la paire reste interdite.
+    expect(play(state, 'p2', '5D', '5C').state.pile).toHaveLength(2);
+    expect(play(state, 'p2', '5D').state.currentPlayerId).toBe('p0');
+  });
+
+  it('ne concerne pas les paires : on y joue normalement', () => {
+    let state = playingGame({
+      p0: ['5H', '5S', '3S'],
+      p1: ['8D', '8C', '4H'],
+      p2: ['13D', '13C', '6C'],
+    });
+    state = play(state, 'p0', '5H', '5S').state;
+    state = play(state, 'p1', '8D', '8C').state;
+    expect(state.skipThreat).toBe(false);
+
+    // p2 enchaîne librement : aucun saut ne s'interpose.
+    state = play(state, 'p2', '13D', '13C').state;
+    expect(state.pile).toHaveLength(3);
+    expect(state.currentPlayerId).toBe('p0');
+  });
+
+  it('sur une paire reposée à l’identique, c’est le carré qui ferme le pli', () => {
+    let state = playingGame({
+      p0: ['5H', '5S', '3S'],
+      p1: ['5D', '5C', '4H'],
+      p2: ['13D', '13C', '6C'],
+    });
+    state = play(state, 'p0', '5H', '5S').state;
+    const result = play(state, 'p1', '5D', '5C');
+
+    // Deux paires de même valeur font quatre cartes : le pli se ferme et p1
+    // reprend la main. Aucun saut n'est armé.
+    expect(result.events.some((e) => e.type === 'carre')).toBe(true);
+    expect(result.state.skipThreat).toBe(false);
+    expect(result.state.currentPlayerId).toBe('p1');
+  });
+
+  it('le chrono fait sauter le joueur menacé sans le sortir du pli', () => {
+    let state = playingGame({
+      p0: ['5H', '3S'],
+      p1: ['5S', '4H'],
+      p2: ['9D', '6C'],
+      p3: ['13C', '7C'],
+    });
+    state = play(state, 'p0', '5H').state;
+    state = play(state, 'p1', '5S').state;
+
+    const expired = tick(state, state.turnDeadline! + 1);
+    expect(expired.events.some((e) => e.type === 'skipped')).toBe(true);
+    expect(expired.state.players.find((p) => p.id === 'p2')!.passed).toBe(false);
+    expect(expired.state.currentPlayerId).toBe('p3');
+  });
+
+  it('le saut n’empêche pas de fermer le pli : tous sautent, le dernier reprend', () => {
+    let state = playingGame({
+      p0: ['5H', '3S'],
+      p1: ['5S', '4H'],
+      p2: ['9D', '6C'],
+    });
+    state = play(state, 'p0', '5H').state;
+    state = play(state, 'p1', '5S').state;
+    state = skip(state, 'p2').state;
+    // Plus personne n'a de 5 : tout le monde passe et p1, dernier poseur,
+    // remporte le pli — p2 est bien repassé par la table avant la fermeture.
+    state = pass(state, 'p0').state;
+    state = pass(state, 'p1').state;
+    expect(state.currentPlayerId).toBe('p2');
+    state = pass(state, 'p2').state;
+
+    expect(state.pile).toHaveLength(0);
+    expect(state.currentPlayerId).toBe('p1');
+    expect(state.skipThreat).toBe(false);
+  });
+
+  it('réglage désactivé : la valeur égale ne fait plus sauter personne', () => {
+    let state = playingGame(
+      { p0: ['5H', '3S'], p1: ['5S', '4H'], p2: ['9D', '6C'] },
+      { skipOnEqual: false },
+    );
+    state = play(state, 'p0', '5H').state;
+    state = play(state, 'p1', '5S').state;
+
+    expect(state.skipThreat).toBe(false);
+    expect(play(state, 'p2', '9D').state.pile).toHaveLength(3);
+  });
+
+  it('un saut refusé hors menace ne change rien', () => {
+    const state = playingGame({ p0: ['5H', '3S'], p1: ['5S', '4H'], p2: ['9D', '6C'] });
+    const result = skip(state, 'p0');
+    expect(result.state).toBe(state);
+    expect(result.events).toHaveLength(0);
   });
 });
 
