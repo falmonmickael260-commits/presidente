@@ -266,38 +266,43 @@ export function GameTable({
 
       {/* ------------------------------ Table ------------------------------ */}
       <div ref={tableRef} className="relative min-h-0 flex-1">
-        {/* Ovale de jeu : profondeur et lumière rasante. */}
-        <div
-          className="pointer-events-none absolute left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[50%]"
-          style={{
-            top: `${ARENA_CENTER_Y * 100}%`,
-            width: '104%',
-            height: '86%',
-            background:
-              'radial-gradient(ellipse at 50% 36%, rgba(255,255,255,0.07), rgba(255,255,255,0.018) 48%, transparent 72%)',
-            boxShadow:
-              'inset 0 1px 0 rgba(255,255,255,0.09), inset 0 -40px 80px rgba(0,0,0,0.4), 0 50px 130px -50px rgba(0,0,0,0.95)',
-          }}
-        />
-        {/* Bord proche : le tapis se prolonge vers le joueur. */}
-        <div
-          className="pointer-events-none absolute inset-x-[-8%] bottom-[-26%] h-[52%] rounded-[50%]"
-          style={{
-            background:
-              'radial-gradient(ellipse at 50% 0%, rgba(17,96,69,0.5), rgba(10,58,42,0.22) 46%, transparent 72%)',
-          }}
-        />
-        {/* Halo sur la zone d'accueil du pli. */}
-        <div
-          className="pointer-events-none absolute left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[50%]"
-          style={{
-            top: `${pileTop}%`,
-            width: '62%',
-            height: '46%',
-            background:
-              'radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.07), transparent 70%)',
-          }}
-        />
+        {/* Décor volontairement débordant, rogné ici même : sans ce calque,
+            son débordement rendait la table défilable, et donner le focus à
+            une carte du bord faisait glisser toute l'interface de 33 px. */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          {/* Ovale de jeu : profondeur et lumière rasante. */}
+          <div
+            className="pointer-events-none absolute left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[50%]"
+            style={{
+              top: `${ARENA_CENTER_Y * 100}%`,
+              width: '104%',
+              height: '86%',
+              background:
+                'radial-gradient(ellipse at 50% 36%, rgba(255,255,255,0.07), rgba(255,255,255,0.018) 48%, transparent 72%)',
+              boxShadow:
+                'inset 0 1px 0 rgba(255,255,255,0.09), inset 0 -40px 80px rgba(0,0,0,0.4), 0 50px 130px -50px rgba(0,0,0,0.95)',
+            }}
+          />
+          {/* Bord proche : le tapis se prolonge vers le joueur. */}
+          <div
+            className="pointer-events-none absolute inset-x-[-8%] bottom-[-26%] h-[52%] rounded-[50%]"
+            style={{
+              background:
+                'radial-gradient(ellipse at 50% 0%, rgba(17,96,69,0.5), rgba(10,58,42,0.22) 46%, transparent 72%)',
+            }}
+          />
+          {/* Halo sur la zone d'accueil du pli. */}
+          <div
+            className="pointer-events-none absolute left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[50%]"
+            style={{
+              top: `${pileTop}%`,
+              width: '62%',
+              height: '46%',
+              background:
+                'radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.07), transparent 70%)',
+            }}
+          />
+        </div>
 
         {ringLayout ? (
           opponents.map((player, index) => {
