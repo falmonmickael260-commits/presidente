@@ -101,6 +101,15 @@ export function GameTable({
     if (deck && hand) setDealOrigin({ dx: deck.x - hand.x, dy: deck.y - hand.y });
   }, [read, director.dealToken]);
 
+  // Un coup refusé par le serveur doit se voir, pas juste s'entendre : sans
+  // ça, le joueur ne sait pas pourquoi sa sélection lui revient dans les mains.
+  const lastShownError = useRef<string | null>(null);
+  useEffect(() => {
+    if (!room.error || room.error === lastShownError.current) return;
+    lastShownError.current = room.error;
+    director.pushNotice(room.error, 'warn');
+  }, [room.error, director]);
+
   // Micro-zoom sur le centre à chaque pose : le regard suit la carte.
   useEffect(() => {
     if (reducedMotion || director.focusToken === 0) return;

@@ -55,6 +55,8 @@ export interface Director {
   focusToken: number;
   lastTrickWinnerId: string | null;
   noteLaunch: (cardId: string, anchor: Anchor) => void;
+  /** Affiche un message ponctuel dans le fil d'événements (ex. un coup refusé). */
+  pushNotice: (text: string, tone?: Notice['tone']) => void;
 }
 
 const FLIGHT_DURATION = 0.62;
@@ -524,5 +526,6 @@ export function useDirector({
     focusToken,
     lastTrickWinnerId,
     noteLaunch,
+    pushNotice,
   };
 }
