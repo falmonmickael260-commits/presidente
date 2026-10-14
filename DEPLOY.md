@@ -28,7 +28,18 @@ une réécriture de `src/server/store.ts`.
 
 Render se connecte à GitHub par OAuth : il n'y a pas de jeton à copier.
 
-## Option 2 — Fly.io
+## Option 2 — Railway
+
+1. [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**
+2. Choisir le dépôt `falmonmickael260-commits/presidente`
+3. Railway lit `railway.json`, construit le `Dockerfile` et déploie
+4. **Vérifier qu'une seule instance tourne** : onglet du service → **Settings** →
+   **Replicas** doit rester à `1`. `railway.json` le fixe par défaut, mais une
+   mise à l'échelle manuelle casserait l'état des parties (en mémoire, non
+   partagé entre instances) — voir la contrainte en tête de ce document.
+5. (Optionnel) Onglet **Variables** → ajouter les deux variables Supabase
+
+## Option 3 — Fly.io
 
 ```bash
 fly auth login          # ouvre le navigateur
@@ -37,7 +48,7 @@ fly secrets set NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
 fly deploy
 ```
 
-## Option 3 — Docker, n'importe où
+## Option 4 — Docker, n'importe où
 
 ```bash
 docker build -t le-president .
@@ -47,7 +58,7 @@ docker run -p 3000:3000 \
   le-president
 ```
 
-## Option 4 — sans conteneur
+## Option 5 — sans conteneur
 
 ```bash
 npm ci && npm run build && npm start
