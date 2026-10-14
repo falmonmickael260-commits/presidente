@@ -460,6 +460,31 @@ export function useDirector({
   /* Synchronisation de rattrapage                                   */
   /* -------------------------------------------------------------- */
 
+  // Filet de sécurité : si l'événement « deal » n'est jamais arrivé (coupure du
+  // flux, mode secours actif pendant la transition), rien ne vide la table
+  // entre deux manches. Les identifiants de carte ne sont pas uniques d'une
+  // manche à l'autre (le même « as de trèfle » revient à chaque donne) : une
+  // pose de la manche précédente qui traîne entre alors en collision avec son
+  // homonyme de la nouvelle manche — deux éléments de la table portant la même
+  // clé React. Le numéro de manche est un signal fiable et indépendant des
+  // événements : on purge dès qu'il change.
+  const roundRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!view) return;
+    if (roundRef.current === null) {
+      roundRef.current = view.roundNumber;
+      return;
+    }
+    if (view.roundNumber === roundRef.current) return;
+    roundRef.current = view.roundNumber;
+    pendingSetData.current.clear();
+    pendingBySet.current.clear();
+    flightSet.current.clear();
+    launchRects.current.clear();
+    setFlights([]);
+    clearTable();
+  }, [view, clearTable]);
+
   // Après une reconnexion, les poses déjà sur la table n'ont jamais été animées :
   // on les considère posées d'office pour éviter un pli vide.
   useEffect(() => {

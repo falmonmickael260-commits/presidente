@@ -98,6 +98,7 @@ export function useFanLayout(cards: Card[], width: number, compact: boolean) {
       totalWidth,
       lift,
       bottomInset,
+      step,
       height: cardHeight + bottomInset + topRoom,
     };
   }, [cards, width, compact]);
@@ -116,7 +117,7 @@ export function HandFan({
   reducedMotion,
 }: HandFanProps) {
   const { bind } = useAnchors();
-  const { slots, cardWidth, cardHeight, bottomInset, height } = useFanLayout(
+  const { slots, cardWidth, cardHeight, bottomInset, height, step } = useFanLayout(
     cards,
     width,
     compact,
@@ -152,6 +153,14 @@ export function HandFan({
           return sum + (Math.sign(distance) * (cardWidth * 0.1)) / Math.abs(distance);
         }, 0);
 
+        // Les cartes se chevauchent : celle du dessus (index supérieur, ou
+        // sélectionnée) capte les clics sur toute sa largeur, mais celle du
+        // dessous ne doit être cliquable que sur sa partie réellement visible
+        // — sinon un tap vise une carte et en sélectionne une autre, au
+        // toucher comme à la souris dans la zone de recouvrement.
+        const isLast = index === slots.length - 1;
+        const hitWidth = isSelected || isLast ? cardWidth : step;
+
         return (
           <motion.button
             key={slot.card.id}
@@ -165,7 +174,7 @@ export function HandFan({
             onClick={() => onToggle(slot.card.id)}
             className="absolute left-1/2 top-auto origin-bottom will-animate no-select disabled:cursor-default"
             style={{
-              width: cardWidth,
+              width: hitWidth,
               height: cardHeight,
               bottom: bottomInset,
               marginLeft: -cardWidth / 2,
@@ -198,7 +207,8 @@ export function HandFan({
                 Séparée de la couche de placement pour que le délai de
                 distribution ne retarde jamais la réaction à la sélection. */}
             <motion.div
-              className="h-full w-full will-animate"
+              className="absolute left-0 top-0 will-animate"
+              style={{ width: cardWidth, height: cardHeight }}
               initial={
                 reducedMotion
                   ? { opacity: 0 }

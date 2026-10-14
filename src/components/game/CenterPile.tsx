@@ -83,7 +83,7 @@ export function CenterPile({
             const isTop = set.id === topSetId;
             return (
               <motion.div
-                key={card.id}
+                key={`${set.id}:${card.id}`}
                 className="absolute will-animate"
                 style={{ zIndex: 10 + set.order * 4 + index }}
                 initial={false}
