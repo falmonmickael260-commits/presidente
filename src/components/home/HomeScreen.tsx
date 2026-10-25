@@ -10,6 +10,7 @@ import { RulesSheet } from '@/components/game/RulesSheet';
 import { Button } from '@/components/ui/Button';
 import { AVATARS, randomAvatar } from '@/lib/avatars';
 import { loadIdentity, saveIdentity, saveSession } from '@/lib/session';
+import { getIncomingPlatformToken, peekPlatformUsername } from '@/lib/platformToken';
 import { sound } from '@/lib/sound';
 import { normalizeRoomCode } from '@/lib/roomCode';
 
@@ -90,6 +91,11 @@ export function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<'create' | 'join' | null>(null);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [platformUsername, setPlatformUsername] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPlatformUsername(peekPlatformUsername(getIncomingPlatformToken()));
+  }, []);
 
   useEffect(() => {
     const identity = loadIdentity();
@@ -109,7 +115,7 @@ export function HomeScreen() {
       const response = await fetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, avatar }),
+        body: JSON.stringify({ name, avatar, rgToken: getIncomingPlatformToken() }),
       });
       const body = (await response.json()) as {
         code?: string;
@@ -186,6 +192,12 @@ export function HomeScreen() {
           transition={{ delay: 0.3, type: 'spring', stiffness: 220, damping: 26 }}
           className="panel rounded-3xl p-5"
         >
+          {platformUsername && (
+            <p className="mb-3 rounded-xl border border-gold-500/25 bg-gold-500/10 px-3 py-2 text-center text-[0.78rem] text-gold-300">
+              Connecté en tant que <strong>{platformUsername}</strong> — vos résultats compteront
+              dans vos statistiques Revanche Game.
+            </p>
+          )}
           <IdentityPicker name={name} avatar={avatar} onName={setName} onAvatar={setAvatar} />
 
           {error && (

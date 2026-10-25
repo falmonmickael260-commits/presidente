@@ -52,6 +52,8 @@ export interface Player {
   isHost: boolean;
   isBot: boolean;
   connected: boolean;
+  /** Identifiant du compte Revanche Game, ou `null` pour un joueur invité. */
+  platformUserId: string | null;
   /** Main privée. Jamais transmise aux autres clients (voir `view.ts`). */
   hand: Card[];
   /** A passé pour le pli en cours. */

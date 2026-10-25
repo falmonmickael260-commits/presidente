@@ -14,6 +14,7 @@ import { buildPlayerView } from '@/game/view';
 import { generatePlayerId, generateRoomCode, generateToken } from './codes';
 import { loadRoom, saveRoom } from './persistence';
 import { redactEvent, type ServerMessage } from './protocol';
+import { reportMatchResult } from './platform';
 
 const ROOM_TTL_MS = 3 * 60 * 60 * 1000;
 const EVENT_HISTORY = 80;
@@ -180,6 +181,18 @@ export function commit(room: Room, events: GameEvent[]) {
   broadcast(room, stamped);
   schedule(room);
   void saveRoom(room.code, room.state, Object.fromEntries(room.tokens));
+
+  // `stamped` passe par ici depuis les trois chemins qui peuvent produire un
+  // `game_over` (action d'un joueur, bot, tick serveur) : un seul point
+  // d'accroche suffit pour déclarer le résultat à la plateforme centrale.
+  // `at` est horodaté une seule fois dans `stamp()`, donc stable pour cette
+  // partie précise même si cette fonction est rappelée (clé d'idempotence).
+  for (const s of stamped) {
+    if (s.event.type === 'game_over') {
+      reportMatchResult(room, s.event.standings, s.at);
+      break;
+    }
+  }
 }
 
 export function dispatch(room: Room, action: GameAction): GameEvent[] {
@@ -266,6 +279,7 @@ export function joinRoom(
   room: Room,
   name: string,
   avatar: string,
+  platformUserId: string | null = null,
 ): JoinOutcome | JoinFailure {
   if (room.state.phase !== 'lobby') {
     return { ok: false, error: 'La partie a déjà commencé.' };
@@ -277,7 +291,7 @@ export function joinRoom(
   const playerId = generatePlayerId();
   const token = generateToken();
   room.tokens.set(token, playerId);
-  room.state = addPlayer(room.state, { id: playerId, name, avatar });
+  room.state = addPlayer(room.state, { id: playerId, name, avatar, platformUserId });
   commit(room, []);
   return { ok: true, token, playerId };
 }

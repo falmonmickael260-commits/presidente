@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { useRoom } from '@/hooks/useRoom';
 import { AVATARS, randomAvatar } from '@/lib/avatars';
 import { clearSession, loadIdentity, loadSession, saveIdentity, saveSession } from '@/lib/session';
+import { getIncomingPlatformToken, peekPlatformUsername } from '@/lib/platformToken';
 import { sound } from '@/lib/sound';
 
 type Probe =
@@ -147,6 +148,11 @@ function JoinGate({
   const [avatar, setAvatar] = useState<string>(AVATARS[0]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [platformUsername, setPlatformUsername] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPlatformUsername(peekPlatformUsername(getIncomingPlatformToken()));
+  }, []);
 
   useEffect(() => {
     const identity = loadIdentity();
@@ -166,7 +172,7 @@ function JoinGate({
       const response = await fetch(`/api/rooms/${code}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, avatar }),
+        body: JSON.stringify({ name, avatar, rgToken: getIncomingPlatformToken() }),
       });
       const body = (await response.json()) as {
         token?: string;
@@ -203,6 +209,11 @@ function JoinGate({
 
           {joinable ? (
             <>
+              {platformUsername && (
+                <p className="mb-3 rounded-xl border border-gold-500/25 bg-gold-500/10 px-3 py-2 text-center text-[0.78rem] text-gold-300">
+                  Connecté en tant que <strong>{platformUsername}</strong>
+                </p>
+              )}
               <IdentityPicker
                 name={name}
                 avatar={avatar}

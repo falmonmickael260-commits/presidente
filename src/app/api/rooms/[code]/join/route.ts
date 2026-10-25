@@ -1,6 +1,13 @@
 import { buildPlayerView } from '@/game/view';
 import { normalizeRoomCode } from '@/server/codes';
-import { jsonError, readJson, sanitizeAvatar, sanitizeName } from '@/server/input';
+import {
+  jsonError,
+  readJson,
+  sanitizeAvatar,
+  sanitizeName,
+  sanitizeToken,
+} from '@/server/input';
+import { verifyPlatformToken } from '@/server/platform-token';
 import { findRoom, joinRoom } from '@/server/store';
 
 export const runtime = 'nodejs';
@@ -18,7 +25,8 @@ export async function POST(
   const name = sanitizeName(body.name);
   if (!name) return jsonError('Choisissez un pseudo de 2 à 16 caractères.', 400);
 
-  const joined = joinRoom(room, name, sanitizeAvatar(body.avatar));
+  const identity = verifyPlatformToken(sanitizeToken(body.rgToken));
+  const joined = joinRoom(room, name, sanitizeAvatar(body.avatar), identity?.uid ?? null);
   if (!joined.ok) return jsonError(joined.error, 409);
 
   return Response.json({

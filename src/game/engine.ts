@@ -78,7 +78,13 @@ export function createGame(options?: {
 
 export function addPlayer(
   state: GameState,
-  player: { id: string; name: string; avatar: string; isBot?: boolean },
+  player: {
+    id: string;
+    name: string;
+    avatar: string;
+    isBot?: boolean;
+    platformUserId?: string | null;
+  },
 ): GameState {
   if (state.players.length >= MAX_PLAYERS) return state;
   if (state.players.some((p) => p.id === player.id)) return state;
@@ -89,6 +95,7 @@ export function addPlayer(
     seat: state.players.length,
     isHost: state.players.length === 0,
     isBot: player.isBot ?? false,
+    platformUserId: player.platformUserId ?? null,
     connected: true,
     hand: [],
     passed: false,

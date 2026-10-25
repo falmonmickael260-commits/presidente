@@ -51,6 +51,12 @@ export function sanitizeSettings(raw: unknown) {
   return out;
 }
 
+/** Jeton d'identité Revanche Game : `<payload base64url>.<signature base64url>`. */
+export function sanitizeToken(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  return /^[A-Za-z0-9_-]{10,2000}\.[A-Za-z0-9_-]{10,200}$/.test(raw) ? raw : null;
+}
+
 export async function readJson(request: Request): Promise<Record<string, unknown>> {
   try {
     const body = await request.json();
