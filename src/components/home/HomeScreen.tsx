@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { AVATARS, randomAvatar } from '@/lib/avatars';
 import { loadIdentity, saveIdentity, saveSession } from '@/lib/session';
 import { getIncomingPlatformToken, peekPlatformUsername } from '@/lib/platformToken';
+import { clearIncomingRoomCode, getIncomingRoomCode } from '@/lib/platformRoom';
 import { sound } from '@/lib/sound';
 import { normalizeRoomCode } from '@/lib/roomCode';
 
@@ -93,19 +94,40 @@ export function HomeScreen() {
   const [rulesOpen, setRulesOpen] = useState(false);
   const [platformUsername, setPlatformUsername] = useState<string | null>(null);
 
+  // Un seul effet au montage : l'identité et l'éventuelle invitation doivent
+  // être résolues ensemble, sinon l'entrée automatique en salle se jouerait
+  // avant de connaître le pseudonyme.
   useEffect(() => {
-    setPlatformUsername(peekPlatformUsername(getIncomingPlatformToken()));
-  }, []);
+    const username = peekPlatformUsername(getIncomingPlatformToken());
+    setPlatformUsername(username);
 
-  useEffect(() => {
     const identity = loadIdentity();
-    if (identity) {
-      setName(identity.name);
-      setAvatar(identity.avatar);
-    } else {
-      setAvatar(randomAvatar());
+    const resolvedAvatar = identity?.avatar ?? randomAvatar();
+
+    // Le pseudonyme du compte Revanche Games prime sur celui stocké
+    // localement : c'est lui qui apparaîtra dans les statistiques, et le
+    // joueur n'a pas à le re-saisir à chaque lancement. Il reste modifiable.
+    // `slice(16)` : la limite du champ de saisie, alors qu'un pseudonyme de
+    // plateforme peut aller jusqu'à 24 caractères.
+    const resolvedName = (username ?? identity?.name ?? '').slice(0, 16);
+
+    setName(resolvedName);
+    setAvatar(resolvedAvatar);
+
+    const invitedRoom = getIncomingRoomCode();
+    if (!invitedRoom) return;
+
+    setCode(invitedRoom);
+
+    // Invitation acceptée depuis la plateforme : on entre directement, sans
+    // faire retaper le code. Sans pseudonyme utilisable (joueur invité), on
+    // se contente de pré-remplir le champ — il reste un clic à faire.
+    if (resolvedName.trim().length >= 2) {
+      saveIdentity({ name: resolvedName, avatar: resolvedAvatar });
+      clearIncomingRoomCode();
+      router.push(`/salle/${invitedRoom}`);
     }
-  }, []);
+  }, [router]);
 
   const create = async () => {
     setBusy('create');
@@ -129,6 +151,7 @@ export function HomeScreen() {
       }
       saveIdentity({ name, avatar });
       saveSession({ code: body.code, token: body.token, playerId: body.playerId });
+      clearIncomingRoomCode();
       router.push(`/salle/${body.code}`);
     } catch {
       setError('Connexion impossible. Vérifiez votre réseau.');
@@ -145,6 +168,7 @@ export function HomeScreen() {
     }
     setBusy('join');
     if (name.trim().length >= 2) saveIdentity({ name, avatar });
+    clearIncomingRoomCode();
     router.push(`/salle/${normalized}`);
   };
 
@@ -196,6 +220,12 @@ export function HomeScreen() {
             <p className="mb-3 rounded-xl border border-gold-500/25 bg-gold-500/10 px-3 py-2 text-center text-[0.78rem] text-gold-300">
               Connecté en tant que <strong>{platformUsername}</strong> — vos résultats compteront
               dans vos statistiques Revanche Game.
+            </p>
+          )}
+          {!platformUsername && code.length >= 4 && (
+            <p className="mb-3 rounded-xl border border-gold-500/25 bg-gold-500/10 px-3 py-2 text-center text-[0.78rem] text-gold-300">
+              Vous êtes invité dans la salle <strong>{code}</strong> — choisissez un pseudo, puis
+              « Rejoindre ».
             </p>
           )}
           <IdentityPicker name={name} avatar={avatar} onName={setName} onAvatar={setAvatar} />
