@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Instrument_Serif, Manrope } from 'next/font/google';
 import './globals.css';
+import { PlatformConnector } from '@/components/PlatformConnector';
 
 const display = Instrument_Serif({
   subsets: ['latin'],
@@ -41,7 +42,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" className={`${display.variable} ${sans.variable}`}>
-      <body className="min-h-dvh antialiased">{children}</body>
+      <body className="min-h-dvh antialiased"><PlatformConnector />{children}</body>
     </html>
   );
 }

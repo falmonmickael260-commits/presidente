@@ -11,16 +11,18 @@ export interface Identity {
 
 const SESSION_PREFIX = 'president:session:';
 const IDENTITY_KEY = 'president:identity';
+const memory = new Map<string, string>();
 
 function safeGet(key: string): string | null {
   try {
-    return window.localStorage.getItem(key);
+    return memory.get(key) ?? window.localStorage.getItem(key);
   } catch {
     return null;
   }
 }
 
 function safeSet(key: string, value: string) {
+  memory.set(key, value);
   try {
     window.localStorage.setItem(key, value);
   } catch {
@@ -44,9 +46,11 @@ export function loadSession(code: string): StoredSession | null {
 export function saveSession(session: StoredSession) {
   if (typeof window === 'undefined') return;
   safeSet(SESSION_PREFIX + session.code, JSON.stringify(session));
+  window.dispatchEvent(new Event('rg:session'));
 }
 
 export function clearSession(code: string) {
+  memory.delete(SESSION_PREFIX + code);
   try {
     window.localStorage.removeItem(SESSION_PREFIX + code);
   } catch {
