@@ -9,7 +9,10 @@ export const adapter: Adapter = {
     const member = room?.state.players.find(p => p.id === id);
     const expected = c.inviter || c.uid;
     if (!room || !member || (member.platformUserId && expected && member.platformUserId !== expected)) throw new Error('Votre ami ne se trouve plus dans ce salon.');
-    if (!member.platformUserId && expected) { member.platformUserId = expected; commit(room, []); }
+    if (!member.platformUserId && expected) {
+      if (room.state.players.some(p => p.id !== member.id && p.platformUserId === expected)) throw new Error('Ce compte possède déjà une place dans le salon.');
+      member.platformUserId = expected; commit(room, []);
+    }
     return { code: room.code, instance: `${room.code}:${room.state.createdAt}`, capacity: MAX_PLAYERS, count: room.state.players.length, status: room.state.phase === 'lobby' ? 'open' : 'started', ownerUid: member.platformUserId };
   },
   async admit(c) {

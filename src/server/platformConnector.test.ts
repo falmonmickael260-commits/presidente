@@ -16,6 +16,8 @@ it('admet le compte invité une fois, conserve sa session et protège la derniè
   const last = await Promise.allSettled([adapter.admit({ ...c, uid: randomUUID() }), adapter.admit({ ...c, uid: randomUUID() })]);
   expect(last.filter(x => x.status === 'fulfilled')).toHaveLength(1);
   expect(room.state.players).toHaveLength(8);
+  const anonymous = [...room.tokens].find(([, id]) => !room.state.players.find(p => p.id === id)?.platformUserId)!;
+  await expect(adapter.inspect({ ...c, uid: guest, inviter: undefined, proof: { code: room.code, token: anonymous[0] } })).rejects.toThrow(/déjà une place/);
   await expect(adapter.inspect({ ...c, proof: { code: room.code, token: 'forged' } })).rejects.toThrow();
   await expect(adapter.admit({ ...c, instance: 'old-instance' })).rejects.toThrow();
 });
