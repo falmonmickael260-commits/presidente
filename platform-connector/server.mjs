@@ -47,6 +47,7 @@ export function verifyCommand(raw, signature, game, key = process.env.PLATFORM_S
       typeof command.room !== 'string' || !/^[A-Za-z0-9_-]{1,32}$/.test(command.room) ||
       !command.proof || command.proof.code !== command.room ||
       (command.operation === 'admit' && (!uuid.test(command.invitation) || !uuid.test(command.inviter) || typeof command.instance !== 'string'))) throw new Error('Commande de plateforme invalide.');
+  if (command.publicJoin !== undefined && (command.operation !== 'admit' || typeof command.publicJoin !== 'boolean')) throw new Error('Admission invalide.');
   return command;
 }
 
@@ -59,6 +60,7 @@ export async function connectorResponse(request, game, adapter) {
     catch { return Response.json({ error: 'Autorisation de plateforme invalide.' }, { status: 403 }); }
     const room = await adapter.inspect(c);
     if (c.operation === 'inspect') return Response.json({ room }, { headers: { 'cache-control': 'no-store' } });
+    if (c.publicJoin && (room.isHost !== true || room.status !== 'open')) throw new Error('Ce salon public n’est plus disponible.');
     if (room.instance !== c.instance) throw new Error('Ce salon a fermé ou a été remplacé.');
     // The adapter rechecks capacity at its atomic native join operation.
     const session = await adapter.admit(c);

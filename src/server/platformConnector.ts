@@ -13,7 +13,7 @@ export const adapter: Adapter = {
       if (room.state.players.some(p => p.id !== member.id && p.platformUserId === expected)) throw new Error('Ce compte possède déjà une place dans le salon.');
       member.platformUserId = expected; commit(room, []);
     }
-    return { code: room.code, instance: `${room.code}:${room.state.createdAt}`, capacity: MAX_PLAYERS, count: room.state.players.length, status: room.state.phase === 'lobby' ? 'open' : 'started', ownerUid: member.platformUserId };
+    return { code: room.code, instance: `${room.code}:${room.state.createdAt}`, capacity: MAX_PLAYERS, count: room.state.players.length, status: room.state.phase === 'lobby' ? 'open' : 'started', ownerUid: member.platformUserId, isHost: member.isHost && member.connected };
   },
   async admit(c) {
     const room = await findRoom(c.room);
